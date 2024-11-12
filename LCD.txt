@@ -1,0 +1,106 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+
+entity chardisplay is
+    Port ( clk : in  STD_LOGIC;
+           reset : in  STD_LOGIC;
+           data : out  STD_LOGIC_VECTOR (7 downto 0);
+           en : out  STD_LOGIC;
+           rs : out  STD_LOGIC);
+end chardisplay;
+
+architecture Behavioral of chardisplay is
+
+    type msg_array is array (0 to 12) of std_logic_vector(7 downto 0); -- Increase size for 13 characters
+    constant msg : msg_array := (
+        "00100000", -- Space (ASCII 32)
+        "01010111", -- W (ASCII 87)
+        "01000101", -- E (ASCII 69)
+        "01001100", -- L (ASCII 76)
+        "01000011", -- C (ASCII 67)
+        "01001111", -- O (ASCII 79)
+        "01001101", -- M (ASCII 77)
+        "01000101", -- E (ASCII 69)
+        "00100000", -- Space (ASCII 32)
+        "01001001", -- I (ASCII 73)
+        "00110010", -- 2 (ASCII 50)
+        "01001001", -- I (ASCII 73)
+        "01010100"  -- T (ASCII 84)
+    );
+
+    signal state : integer := 0;  -- State machine state
+    signal index : integer := 0;   -- Index for the message
+    signal counter : integer := 0;  -- Counter for timing
+    constant clk_div : integer := 12000; -- For a 1 ms delay at 12 MHz
+
+begin
+
+    process(clk, reset)
+    begin
+        if reset = '1' then
+            state <= 0;
+            index <= 0;
+            data <= (others => '0');  -- Default value for data
+            en <= '0';                 -- Default value for enable
+            rs <= '0';                 -- Default value for register select
+            counter <= 0;
+        elsif rising_edge(clk) then
+            case state is
+                when 0 =>
+                    rs <= '0';                      -- Instruction mode
+                    data <= "00111000";             -- Function set: 8-bit mode, 2 lines, 5x8 dots
+                    en <= '1';                      -- Enable signal high for initialization
+                    state <= 1;
+
+                when 1 =>
+                    en <= '0';                      -- Disable enable after the command
+                    counter <= counter + 1;
+                    if counter >= clk_div then
+                        counter <= 0;
+                        rs <= '0';                  -- Instruction mode
+                        data <= "00001100";         -- Display ON, cursor OFF
+                        en <= '1';                  -- Enable signal high for next command
+                        state <= 2;
+                    end if;
+
+                when 2 =>
+                    en <= '0';                      -- Disable enable after the command
+                    counter <= counter + 1;
+                    if counter >= clk_div then
+                        counter <= 0;
+                        rs <= '0';                  -- Instruction mode
+                        data <= "00000001";         -- Clear display
+                        en <= '1';                  -- Enable signal high for clear command
+                        state <= 3;
+                    end if;
+
+                when 3 =>
+                    en <= '0';                      -- Disable enable after the command
+                    counter <= counter + 1;
+                    if counter >= clk_div then
+                        counter <= 0;
+                        if index < 13 then          -- For " WELCOME I2IT" (13 characters with leading space)
+                            rs <= '1';              -- Data mode
+                            data <= msg(index);     -- Send character from the message array
+                            en <= '1';              -- Enable signal high for character data
+                            index <= index + 1;
+                        else
+                            state <= 4;             -- Finished displaying message
+                        end if;
+                    end if;
+
+                when 4 =>
+                    en <= '0';                      -- Stay in this state to do nothing
+
+                when others =>
+                    state <= 0;                     -- Default case
+            end case;
+
+        end if;
+    end process;
+
+
+end Behavioral;

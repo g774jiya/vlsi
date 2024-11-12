@@ -1,0 +1,96 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+
+entity chardisplay is
+    Port ( clk : in  STD_LOGIC;
+           reset : in  STD_LOGIC;
+           data : out  STD_LOGIC_VECTOR (7 downto 0);
+           en : out  STD_LOGIC;
+           rs : out  STD_LOGIC);
+end chardisplay;
+
+architecture Behavioral of chardisplay is
+
+    type msg_array is array (0 to 4) of std_logic_vector(7 downto 0); 
+    constant msg : msg_array := (
+        "00100000", -- Space (ASCII 32)
+        "01001001", -- I (ASCII 73)
+        "00110010", -- 2 (ASCII 50)
+        "01001001", -- I (ASCII 73)
+        "01010100"  -- T (ASCII 84)
+    );
+
+    signal state : integer := 0;  
+    signal index : integer := 0;   
+    signal counter : integer := 0;  
+    constant clk_div : integer := 12000; -- Adjust as needed for your LCD
+
+begin
+
+    process(clk, reset)
+    begin
+        if reset = '1' then
+            state <= 0; 
+            index <= 0; 
+            data <= (others => '0');  
+            en <= '0';                 
+            rs <= '0';                 
+            counter <= 0;
+        elsif rising_edge(clk) then
+            case state is
+                when 0 =>
+                    rs <= '0'; 
+                    data <= "00111000";          -- Function set: 8-bit, 2 lines, 5x8 dots
+                    en <= '1';                  -- Enable signal high
+                    state <= 1;
+
+                when 1 =>
+                    en <= '0'; 
+                    counter <= counter + 1;
+                    if counter >= clk_div then
+                        counter <= 0; 
+                        rs <= '0'; 
+                        data <= "00001100";      -- Display ON, cursor OFF
+                        en <= '1';              
+                        state <= 2;
+                    end if;
+
+                when 2 =>
+                    en <= '0'; 
+                    counter <= counter + 1;
+                    if counter >= clk_div then
+                        counter <= 0; 
+                        rs <= '0'; 
+                        data <= "00000001";      -- Clear display
+                        en <= '1';              
+                        state <= 3;
+                    end if;
+
+                when 3 =>
+                    en <= '0'; 
+                    counter <= counter + 1;
+                    if counter >= clk_div then
+                        counter <= 0;
+                        if index < 5 then        -- For " I2IT" (5 characters including space)
+                            rs <= '1';           -- Data mode
+                            data <= msg(index);  -- Send character
+                            en <= '1';           -- Enable signal high
+                            index <= index + 1;
+                        else
+                            state <= 4;          -- Finished
+                        end if;
+                    end if;
+
+                when 4 =>
+                    en <= '0';                  -- Stay in this state
+
+                when others =>
+                    state <= 0;                 -- Reset to initial state
+            end case;
+        end if;
+    end process;
+
+end Behavioral;

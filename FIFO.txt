@@ -1,0 +1,54 @@
+
+----------------------------------------------------------------------------------
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+entity memoryfifo is
+    Port (
+        clk     : in  STD_LOGIC;
+        rst     : in  STD_LOGIC;
+        wr_en   : in  STD_LOGIC;  -- Write enable
+        rd_en   : in  STD_LOGIC;  -- Read enable
+        din     : in  STD_LOGIC_VECTOR(3 downto 0);  -- Data input
+        dout    : out STD_LOGIC_VECTOR(3 downto 0);  -- Data output
+        full    : out STD_LOGIC;  -- FIFO full flag
+        empty   : out STD_LOGIC     -- FIFO empty flag
+    );
+end memoryfifo;
+
+architecture Behavioral of memoryfifo is
+    type fifo_array is array (0 to 3) of STD_LOGIC_VECTOR(3 downto 0);
+    signal fifo_mem : fifo_array := (others => (others => '0'));
+    signal count    : integer := 0;
+
+begin
+    process(clk, rst)
+        variable wr_ptr : integer := 0;
+        variable rd_ptr : integer := 0;
+    begin
+        if rst = '1' then
+            wr_ptr := 0;
+            rd_ptr := 0;
+            count <= 0;  -- Use signal assignment
+            dout <= (others => '0');
+        elsif rising_edge(clk) then
+            if wr_en = '1' and count < 4 then
+                fifo_mem(wr_ptr) <= din;
+                wr_ptr := (wr_ptr + 1) mod 4;
+                count <= count + 1;  -- Use signal assignment
+            end if;
+
+            if rd_en = '1' and count > 0 then
+                dout <= fifo_mem(rd_ptr);
+                rd_ptr := (rd_ptr + 1) mod 4;
+                count <= count - 1;  -- Use signal assignment
+            end if;
+        end if;
+    end process;
+
+    full <= '1' when count = 4 else '0';
+    empty <= '1' when count = 0 else '0';
+
+end Behavioral;
